@@ -1,86 +1,52 @@
-import logging
-from datetime import datetime
-from time import time
+from fastapi import HTTPException, Request, status
+from jose import JWTError, jwt
 
-from configs.redis import redis_client
-
-logger = logging.getLogger("chat_analytics")
+from admin_service.configs.base_config import BaseConfig
 
 
-# Response Builder
+def verify_authentication(request: Request):
+    """
+    Verifies JWT from:
+    1. Authorization header (Bearer token)
+    2. Session (legacy / browser-based)
+    """
 
+    token = None
 
-def build_response(nlp_result: dict) -> dict:
-    route = nlp_result["route"]
+    # ------------------ Authorization Header ------------------
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
 
-    if nlp_result["handoff_detected"]:
-        return {"type": "ESCALATE", "message": "Connecting you to a human agent."}
+    # ------------------ Session Fallback ------------------
+    elif "loginer_details" in request.session:
+        token = request.session["loginer_details"]
 
-    if route == "NORMAL":
-        return {"type": "BOT", "message": f"Handling intent: {nlp_result['intent']}"}
-
-    if route == "CLARIFY":
-        return {"type": "CLARIFY", "message": "Can you please clarify your request?"}
-
-    if route == "FALLBACK":
-        suggestions = nlp_result.get("fallback_suggestions", [])
-        if suggestions:
-            return {
-                "type": "SUGGEST",
-                "message": "Did you mean one of these?",
-                "options": suggestions,
-            }
-
-        return {"type": "BOT", "message": "I'm sorry, I didn't understand that."}
-
-
-# Escalation
-
-
-def should_escalate(nlp_result: dict) -> bool:
-    return nlp_result["handoff_detected"] or nlp_result["route"] == "FALLBACK"
-
-
-# Logging Events
-
-
-def log_event(event_type: str, payload: dict):
-    payload["event"] = event_type
-    payload["timestamp"] = datetime.utcnow().isoformat()
-    logger.info(payload)
-
-
-# Circuit Breaker
-
-
-FAILURE_LIMIT = 5
-COOLDOWN_SECONDS = 30
-
-
-def _failures_key(service: str) -> str:
-    return f"cb:{service}:failures"
-
-
-def _open_until_key(service: str) -> str:
-    return f"cb:{service}:open_until"
-
-
-def allow_request(service: str) -> bool:
-    open_until = redis_client.get(_open_until_key(service))
-    if not open_until:
-        return True
-    return time() > float(open_until)
-
-
-def record_failure(service: str):
-    failures = redis_client.incr(_failures_key(service))
-
-    if failures >= FAILURE_LIMIT:
-        redis_client.set(
-            _open_until_key(service), time() + COOLDOWN_SECONDS, ex=COOLDOWN_SECONDS
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
         )
 
+    try:
+        payload = jwt.decode(
+            token,
+            BaseConfig.SECRET_KEY,
+            algorithms=[BaseConfig.ALGORITHM],
+        )
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        ) from exc
 
-def record_success(service: str):
-    redis_client.delete(_failures_key(service))
-    redis_client.delete(_open_until_key(service))
+    loginer_name = payload.get("loginer_name")
+    loginer_role = payload.get("loginer_role")
+
+    if not loginer_name:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid session",
+        )
+
+    return loginer_name, loginer_role, token

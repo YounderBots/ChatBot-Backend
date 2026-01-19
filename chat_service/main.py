@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.sessions import SessionMiddleware
 
-app = FastAPI(title="Chat Service", version="00.1", root_path="/hms")
+app = FastAPI(title="Chat Service", version="00.1", root_path="/chat")
 
 app.add_middleware(
     CORSMiddleware,

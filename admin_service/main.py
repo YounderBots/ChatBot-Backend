@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.sessions import SessionMiddleware
 
-app = FastAPI(title="Chat Service", version="00.1", root_path="/hms")
+app = FastAPI(title="Chat Service", version="00.1", root_path="/admin")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,10 +43,10 @@ def startup() -> None:
 @app.get("/")
 def root_api():
     """
-    Root endpoint for Chat Service.
+    Root endpoint for Admin Service.
     Authentication not required.
     """
-    return JSONResponse({"message": "Welcome to Chat Service"})
+    return JSONResponse({"message": "Welcome to Admin Service"})
 
 
 app.include_router(router)
