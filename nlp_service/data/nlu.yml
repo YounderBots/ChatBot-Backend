@@ -1,0 +1,144 @@
+version: "3.1"
+
+nlu:
+
+- intent: greeting
+  examples: |
+    - hi
+    - hello
+    - good morning
+    - good evening
+    - hey there
+    - hi bot
+    - greetings
+
+- intent: goodbye
+  examples: |
+    - bye
+    - goodbye
+    - see you later
+    - thanks that's all
+    - exit
+
+- intent: company_info
+  examples: |
+    - tell me about Younderbots
+    - who are you
+    - what does your company do
+    - company information
+    - about your company
+
+- intent: services_overview
+  examples: |
+    - what services do you offer
+    - list your services
+    - what can you do for me
+    - software development services
+
+- intent: product_inquiry_general
+  examples: |
+    - what products do you offer
+    - list your products
+    - ready-made software
+    - available products
+
+- intent: custom_software_development
+  examples: |
+    - custom software development
+    - I need custom software
+    - build software for me
+    - tailor-made software
+    - I have a software idea
+
+- intent: website_design_development
+  examples: |
+    - website development
+    - I need a website
+    - web design services
+    - build a website
+
+- intent: ui_ux_design
+  examples: |
+    - UI UX design
+    - app design
+    - user experience design
+    - interface design
+
+- intent: chatbot_development_detailed
+  examples: |
+    - chatbot development
+    - build a chatbot
+    - AI chatbot
+    - conversational AI
+
+- intent: resource_outsourcing
+  examples: |
+    - hire developers
+    - staff augmentation
+    - dedicated resources
+    - outsource developers
+
+- intent: mobile_app_development
+  examples: |
+    - mobile app development
+    - build mobile app
+    - android app
+    - ios app
+
+- intent: tickzor_inquiry
+  examples: |
+    - what is Tickzor
+    - Tickzor features
+    - project management software
+
+- intent: hrms_inquiry
+  examples: |
+    - HRMS software
+    - human resource management system
+    - payroll software
+
+- intent: erp_inquiry
+  examples: |
+    - ERP system
+    - enterprise resource planning
+    - business management software
+
+- intent: pricing_inquiry
+  examples: |
+    - pricing
+    - how much does it cost
+    - price details
+    - get a quote
+
+- intent: demo_request
+  examples: |
+    - I want a demo
+    - schedule demo
+    - book demo
+
+- intent: contact_inquiry
+  examples: |
+    - contact details
+    - email address
+    - phone number
+
+- intent: fallback
+  examples: |
+    - asdasdasd
+    - random text
+    - I don't know
+
+- synonym: Tickzor
+  examples: |
+    - tickzor
+    - project management software
+
+- synonym: HRMS
+  examples: |
+    - hrms
+    - human resource system
+
+- synonym: ERP
+  examples: |
+    - erp
+    - enterprise resource planning

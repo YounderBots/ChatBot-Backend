@@ -1,0 +1,20 @@
+{
+  "0": "chatbot_development_detailed",
+  "1": "company_info",
+  "2": "contact_inquiry",
+  "3": "custom_software_development",
+  "4": "demo_request",
+  "5": "erp_inquiry",
+  "6": "fallback",
+  "7": "goodbye",
+  "8": "greeting",
+  "9": "hrms_inquiry",
+  "10": "mobile_app_development",
+  "11": "pricing_inquiry",
+  "12": "product_inquiry_general",
+  "13": "resource_outsourcing",
+  "14": "services_overview",
+  "15": "tickzor_inquiry",
+  "16": "ui_ux_design",
+  "17": "website_design_development"
+}

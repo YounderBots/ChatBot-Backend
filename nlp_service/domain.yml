@@ -1,0 +1,55 @@
+version: "3.1"
+
+intents:
+  - greeting
+  - goodbye
+  - company_info
+  - services_overview
+  - product_inquiry_general
+  - custom_software_development
+  - website_design_development
+  - ui_ux_design
+  - chatbot_development_detailed
+  - resource_outsourcing
+  - mobile_app_development
+  - tickzor_inquiry
+  - hrms_inquiry
+  - erp_inquiry
+  - hotel_software_inquiry
+  - property_management_inquiry
+  - school_management_inquiry
+  - testing_services_inquiry
+  - pricing_inquiry
+  - demo_request
+  - contact_inquiry
+  - portfolio_inquiry
+  - technology_stack
+  - industries_served
+  - development_process
+  - why_choose_us
+  - career_inquiry
+  - maintenance_support
+  - payment_terms
+  - project_timeline
+  - testimonials_reviews
+  - nda_confidentiality
+  - comparison_competitors
+  - refund_policy
+  - scalability_inquiry
+  - fallback
+
+entities:
+  - product
+  - service
+  - industry
+  - technology
+  - resource_type
+  - inquiry_type
+  - budget_range
+  - urgency_level
+
+responses: {}
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: false
