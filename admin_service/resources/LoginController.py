@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from models import get_db
+from models.models import RolePermission, SideMenuCategory, User
+from resources.utils import create_access_token, verify_hash
 from sqlalchemy.orm import Session
-
-from admin_service.models import get_db
-from admin_service.models.models import RolePermission, SideMenuCategory, User
-from admin_service.resources.utils import create_access_token, verify_hash
 
 router = APIRouter()
 

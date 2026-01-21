@@ -1,17 +1,10 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from models import get_db
+from models.models import Intent, NLPSetting, QuickReply, Response, TrainingPhrase
+from resources.utils import verify_authentication
 from sqlalchemy.orm import Session
-
-from admin_service.models import get_db
-from admin_service.models.models import (
-    Intent,
-    NLPSetting,
-    QuickReply,
-    Response,
-    TrainingPhrase,
-)
-from admin_service.resources.utils import verify_authentication
 
 router = APIRouter()
 

@@ -2,10 +2,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import bcrypt
+from configs.base_config import BaseConfig
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
-
-from admin_service.configs.base_config import BaseConfig
 
 
 def verify_authentication(request: Request):

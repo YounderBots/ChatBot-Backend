@@ -3,11 +3,10 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from models import get_db
+from models.models import Role, RolePermission, User
+from resources.utils import hash_text, verify_authentication
 from sqlalchemy.orm import Session
-
-from admin_service.models import get_db
-from admin_service.models.models import Role, RolePermission, User
-from admin_service.resources.utils import hash_text, verify_authentication
 
 router = APIRouter()
 
@@ -54,7 +53,7 @@ def create_role(request: Request, payload: dict, db: Session = Depends(get_db)):
         )
 
         db.add(role)
-        db.flush(role)
+        db.flush()
         permissions = payload.get("permissions")
 
         if permissions:
@@ -67,6 +66,7 @@ def create_role(request: Request, payload: dict, db: Session = Depends(get_db)):
                     edit=pm.get("edit"),
                     delete=pm.get("delete"),
                     view=pm.get("view"),
+                    created_by="1",
                 )
                 db.add(permission)
 
@@ -206,7 +206,7 @@ def delete_role(
 # -------------------------------------------------
 
 
-@router.post("/users")
+@router.post("/user")
 def create_users(request: Request, payload: dict, db: Session = Depends(get_db)):
     try:
         user_id, _, _ = verify_authentication(request)
@@ -226,6 +226,7 @@ def create_users(request: Request, payload: dict, db: Session = Depends(get_db))
         hashed_password = hash_text(password)
 
         image = payload.get("profile_image")
+        file_location = None
         if image:
             upload_file = image.content_type
             extention = upload_file.split("/")[-1]
@@ -238,13 +239,20 @@ def create_users(request: Request, payload: dict, db: Session = Depends(get_db))
             fullname=payload.get("fullname"),
             email=payload.get("email"),
             password=hashed_password,
-            role=payload.get("role"),
+            role=int(payload.get("role")),
             email_notification=payload.get("email_notification"),
             profile_image=file_location,
             created_by=user_id,
         )
         db.add(user)
         db.commit()
+        db.refresh(user)
+
+        return {
+            "status": "Success",
+            "message": "User Added Successfully",
+            "user_id": user.id,
+        }
 
     except Exception as e:
         db.rollback()
@@ -339,7 +347,7 @@ def update_user(
             with open(file_location, "wb+") as file_object:
                 shutil.copyfileobj(image.file, file_object)
 
-        user.full_name = payload.get("fullname", user.full_name)
+        user.fullname = payload.get("fullname", user.fullname)
         user.email = payload.get("email", user.email)
         user.password = password if password else user.password
         user.profile_image = file_location if image else user.profile_image
@@ -351,6 +359,12 @@ def update_user(
         user.updated_by = user_id
 
         db.commit()
+
+        return {
+            "status": "Success",
+            "message": "User Updated Successfully",
+            "user_id": user.id,
+        }
 
     except Exception as e:
         db.rollback()
@@ -379,6 +393,12 @@ def delete_user(request: Request, user_id: int, db: Session = Depends(get_db)):
         user.updated_by = user_id
 
         db.commit()
+
+        return {
+            "status": "Success",
+            "message": "User Deleted Successfully",
+            "user_id": user.id,
+        }
 
     except Exception as e:
         db.rollback()

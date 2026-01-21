@@ -1,8 +1,7 @@
 from fastapi import APIRouter
-
-from admin_service.resources.HrmsController import router as hrmsRoute
-from admin_service.resources.IntentsController import router as chatRoute
-from admin_service.resources.LoginController import router as loginRoute
+from resources.HrmsController import router as hrmsRoute
+from resources.IntentsController import router as chatRoute
+from resources.LoginController import router as loginRoute
 
 router = APIRouter()
 
