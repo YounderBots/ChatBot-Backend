@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -66,6 +68,8 @@ def create_role(request: Request, payload: dict, db: Session = Depends(get_db)):
                 )
                 db.add(permission)
 
+        db.commit()
+
         return {
             "status": "Success",
             "message": "Role Saved Successfully",
@@ -73,6 +77,7 @@ def create_role(request: Request, payload: dict, db: Session = Depends(get_db)):
         }
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
@@ -81,51 +86,70 @@ def create_role(request: Request, payload: dict, db: Session = Depends(get_db)):
 
 @router.post("/update_role/{role_id}")
 def update_role(
-    request: Request, payload: dict, role_id: int, db: Session = Depends(get_db)
+    request: Request,
+    role_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
 ):
 
     try:
         loginer_name, _, _ = verify_authentication(request)
 
-        role = db.query(Role).filter(Role.id == role_id, Role.status == "ACTIVE")
-
-        existing_role = db.query(Role).filter((Role.name == payload["name"])).first()
-
-        if existing_role:
+        role = db.query(Role).filter(Role.id == role_id).first()
+        if not role:
             raise HTTPException(
-                status_code=409,
-                detail="Role with same role_name already exists",
+                status_code=404,
+                detail="Role not found",
             )
 
-        role = Role(
-            name=payload["name"],
-            created_by=loginer_name,
+        if "name" in payload:
+            existing_role = (
+                db.query(Role)
+                .filter(
+                    Role.id != role_id,
+                    Role.name == payload.get("name"),
+                )
+                .first()
+            )
+
+            if existing_role:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Role with same role_name already exists",
+                )
+
+        role.name = payload.get("name", role.name)
+        role.updated_at = datetime.utcnow()
+        role.updated_by = loginer_name
+
+        db.query(RolePermission).filter(RolePermission.role_id == role_id).delete(
+            synchronize_session=False
         )
 
-        db.add(role)
-        db.flush(role)
-        permissions = payload.get("permissions")
+        permissions = payload.get("permissions", [])
 
-        if permissions:
-
-            for pm in permissions:
-                permission = RolePermission(
+        for pm in permissions:
+            db.add(
+                RolePermission(
                     role_id=role.id,
                     menu=pm.get("menu"),
-                    add=pm.get("add"),
-                    edit=pm.get("edit"),
-                    delete=pm.get("delete"),
-                    view=pm.get("view"),
+                    add=pm.get("add", False),
+                    edit=pm.get("edit", False),
+                    delete=pm.get("delete", False),
+                    view=pm.get("view", False),
                 )
-                db.add(permission)
+            )
+
+        db.commit()
 
         return {
             "status": "Success",
-            "message": "Role Saved Successfully",
+            "message": "Role Updated Successfully",
             "role_id": role.id,
         }
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",

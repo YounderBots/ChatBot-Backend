@@ -142,6 +142,8 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
                     db.add(quick_reply)
                     db.refresh(quick_reply)
 
+        db.commit()
+
         return {
             "status": "Success",
             "message": "Intent Saved Successfully",
@@ -149,6 +151,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
         }
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
@@ -308,6 +311,7 @@ def delete_intent(request: Request, intent_id: int, db: Session = Depends(get_db
         return {"status": "Success", "message": "Intent Deleted Successfully"}
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
