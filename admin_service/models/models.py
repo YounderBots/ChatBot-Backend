@@ -7,8 +7,8 @@ class Role(Base):
 
     __tablename__ = "role"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    name = Column(String(50), nullable=False)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    name = Column(String(50), nullable=False, index=True)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
     created_by = Column(String(50), nullable=False)
@@ -20,9 +20,9 @@ class RolePermission(Base):
 
     __tablename__ = "role_permission"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    role_id = Column(Integer, nullable=False)
-    menu_id = Column(String(50), nullable=True)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    role_id = Column(Integer, nullable=False, index=True)
+    menu_id = Column(String(50), nullable=True, index=True)
     add = Column(String(50), nullable=True)
     edit = Column(String(50), nullable=True)
     delete = Column(String(50), nullable=True)
@@ -54,9 +54,9 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     full_name = Column(String(100), nullable=False, unique=True)
-    email = Column(String(100), nullable=False, unique=True)
+    email = Column(String(100), nullable=False, unique=True, index=True)
     profile_image = Column(Text, nullable=True)
     password = Column(String(100), nullable=False)
     role = Column(Integer, nullable=False)
@@ -72,7 +72,7 @@ class Intent(Base):
 
     __tablename__ = "intents"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     intent_name = Column(String(100), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     description = Column(Text)
@@ -95,7 +95,7 @@ class IntentCategory(Base):
 
     __tablename__ = "intent_category"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
@@ -108,8 +108,8 @@ class TrainingPhrase(Base):
 
     __tablename__ = "training_phrases"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    intent_id = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    intent_id = Column(Integer, nullable=False, index=True)
     phrase = Column(Text, nullable=False)
     language = Column(String(10), default="en")
     status = Column(String(50), default="ACTIVE")
@@ -123,8 +123,8 @@ class Response(Base):
 
     __tablename__ = "responses"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    intent_id = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    intent_id = Column(Integer, nullable=False, index=True)
     response_text = Column(Text, nullable=False)
     response_type = Column(String(100), nullable=True)
     priority = Column(Integer, default=1)
@@ -140,8 +140,8 @@ class QuickReply(Base):
 
     __tablename__ = "quick_reply"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    response_id = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    response_id = Column(Integer, nullable=False, index=True)
     button_text = Column(String(50), nullable=False)
     action_type = Column(String(50), nullable=False)
     message_value = Column(Text, nullable=False)
@@ -156,8 +156,8 @@ class ArticleCategory(Base):
 
     __tablename__ = "article_category"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    name = Column(String(50), nullable=False)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    name = Column(String(50), nullable=False, index=True)
     order = Column(Integer, nullable=False)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
@@ -170,7 +170,7 @@ class NLPSetting(Base):
 
     __tablename__ = "nlp_settings"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     key = Column(String(100), unique=True, nullable=False)
     value = Column(String(255), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
