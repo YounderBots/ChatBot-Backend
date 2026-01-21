@@ -158,7 +158,7 @@ class ArticleCategory(Base):
 
     id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     name = Column(String(50), nullable=False, index=True)
-    order = Column(Integer, nullable=False)
+    order = Column(Integer, unique=True, nullable=False)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
     created_by = Column(String(50), nullable=False)

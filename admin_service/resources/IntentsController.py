@@ -2,7 +2,14 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from models import get_db
-from models.models import Intent, NLPSetting, QuickReply, Response, TrainingPhrase
+from models.models import (
+    Intent,
+    IntentCategory,
+    NLPSetting,
+    QuickReply,
+    Response,
+    TrainingPhrase,
+)
 from resources.utils import verify_authentication
 from sqlalchemy.orm import Session
 
@@ -136,7 +143,6 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
                         created_by=user_id,
                     )
                     db.add(quick_reply)
-                    db.refresh(quick_reply)
 
         db.commit()
 
@@ -415,6 +421,153 @@ def list_quick_reply(request: Request, response_id: int, db: Session = Depends(g
         return replies
 
     except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from e
+
+
+@router.get("/category")
+def list_intent_category(request: Request, db: Session = Depends(get_db)):
+
+    try:
+        verify_authentication(request)
+
+        category = (
+            db.query(IntentCategory).filter(IntentCategory.status != "DELETED").all()
+        )
+
+        return category
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from e
+
+
+@router.post("/category")
+def create_intent_category(
+    request: Request, payload: dict, db: Session = Depends(get_db)
+):
+
+    try:
+        user_id, _, _ = verify_authentication(request)
+
+        existing_category = (
+            db.query(IntentCategory)
+            .filter(
+                (IntentCategory.name == payload["name"]),
+                IntentCategory.status != "DELETED",
+            )
+            .first()
+        )
+
+        if existing_category:
+            raise HTTPException(
+                status_code=409,
+                detail="Intent with same category name already exists",
+            )
+
+        category = IntentCategory(
+            name=payload["name"],
+            status=payload.get("status"),
+            created_by=user_id,
+        )
+
+        db.add(category)
+        db.commit()
+
+        return {
+            "status": "Success",
+            "message": "Category Saved Successfully",
+            "category_id": category.id,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from e
+
+
+@router.post("/updatecategory/{category_id}")
+def update_intent_category(
+    request: Request,
+    category_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+):
+    try:
+        user_id, _, _ = verify_authentication(request)
+
+        category = (
+            db.query(IntentCategory)
+            .filter(
+                IntentCategory.id == category_id, IntentCategory.status != "DELETED"
+            )
+            .first()
+        )
+        if not category:
+            raise HTTPException(404, "Intent not found")
+
+        existing_category = (
+            db.query(IntentCategory)
+            .filter(
+                (IntentCategory.name == payload["name"]),
+                IntentCategory.id != category.id,
+            )
+            .first()
+        )
+
+        if existing_category:
+            raise HTTPException(
+                status_code=409,
+                detail="Intent with same intent_name already exists",
+            )
+
+        # -----------------------------
+        # UPDATE INTENT
+        # -----------------------------
+        category.name = payload.get("name", category.name)
+        category.status = payload.get("status", category.status)
+        category.updated_by = user_id
+
+        db.commit()
+
+        return {"status": "Success", "message": "Category Updated Successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, "Internal Server Error") from e
+
+
+@router.post("/deletecategory/{category_id}")
+def delete_intent_category(
+    request: Request, category_id: int, db: Session = Depends(get_db)
+):
+
+    try:
+        user_id, _, _ = verify_authentication(request)
+        category = (
+            db.query(IntentCategory)
+            .filter(
+                IntentCategory.id == category_id, IntentCategory.status != "DELETED"
+            )
+            .first()
+        )
+        if not category:
+            raise HTTPException(404, "Intent not found")
+
+        category.status = "DELETED"
+        category.updated_by = user_id
+
+        db.commit()
+        return {"status": "Success", "message": "Category Deleted Successfully"}
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",

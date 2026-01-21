@@ -111,6 +111,7 @@ def login(request: Request, email: str, password: str, db: Session = Depends(get
                     "id": user.id,
                     "email": user.email,
                     "role_id": user.role,
+                    "token": access_token,
                 },
                 "rolepermission": sorted_menus,
             }
