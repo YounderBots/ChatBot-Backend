@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta
+from typing import Optional
+
+import bcrypt
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
 
@@ -40,13 +44,46 @@ def verify_authentication(request: Request):
             detail="Invalid or expired token",
         ) from exc
 
-    loginer_name = payload.get("loginer_name")
-    loginer_role = payload.get("loginer_role")
+    user_id = payload.get("user_id")
+    user_role = payload.get("user_role")
 
-    if not loginer_name:
+    if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid session",
         )
 
-    return loginer_name, loginer_role, token
+    return user_id, user_role, token
+
+
+def hash_text(plain_text: str) -> str:
+    """
+    Hash a given plain text using bcrypt.
+    Returns hashed string.
+    """
+    if not plain_text:
+        raise ValueError("Text to hash cannot be empty")
+
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(plain_text.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+
+def verify_hash(plain_text: str, hashed_text: str) -> bool:
+    """
+    Verify plain text against bcrypt hash.
+    """
+    return bcrypt.checkpw(
+        plain_text.encode("utf-8"),
+        hashed_text.encode("utf-8"),
+    )
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(
+        to_encode, BaseConfig.SECRET_KEY, algorithm=BaseConfig.ALGORITHM
+    )
+    return encoded_jwt

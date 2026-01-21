@@ -22,7 +22,7 @@ class RolePermission(Base):
 
     id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
     role_id = Column(Integer, nullable=False)
-    menu = Column(String(50), nullable=True)
+    menu_id = Column(String(50), nullable=True)
     add = Column(String(50), nullable=True)
     edit = Column(String(50), nullable=True)
     delete = Column(String(50), nullable=True)
@@ -32,6 +32,22 @@ class RolePermission(Base):
     created_by = Column(String(50), nullable=False)
     updated_at = Column(DateTime, onupdate=func.now())
     updated_by = Column(String(50), nullable=True)
+
+
+class SideMenuCategory(Base):
+
+    __tablename__ = "sidemenu_category"
+
+    id = Column(Integer, primary_key=True, index=True)
+    menu_name = Column(String(255), nullable=False, index=True)
+    menu_icon = Column(String(255), nullable=False)
+    menu_link = Column(String(255), nullable=False)
+    order_no = Column(Integer, nullable=False)
+    status = Column(String(255), nullable=False)
+    created_by = Column(String(255), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
+    updated_by = Column(String(255), nullable=False)
 
 
 class User(Base):

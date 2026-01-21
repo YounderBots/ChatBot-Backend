@@ -42,11 +42,14 @@ def list_intents(request: Request, db: Session = Depends(get_db)):
 def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)):
 
     try:
-        loginer_name, _, _ = verify_authentication(request)
+        user_id, _, _ = verify_authentication(request)
 
         existing_intent = (
             db.query(Intent)
-            .filter((Intent.intent_name == payload["intent_name"]))
+            .filter(
+                (Intent.intent_name == payload["intent_name"]),
+                Intent.status != "DELETED",
+            )
             .first()
         )
 
@@ -66,7 +69,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
             confidence=payload.get("confidence", 60),
             response_status=payload.get("response_status"),
             status=payload.get("status"),
-            created_by=loginer_name,
+            created_by=user_id,
         )
 
         # -----------------------------
@@ -103,7 +106,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
                 intent_id=intent.id,
                 phrase=phrase.get("phrase"),
                 language=phrase.get("language"),
-                created_by=loginer_name,
+                created_by=user_id,
             )
             db.add(trainingphrase)
 
@@ -118,7 +121,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
                 response_text=response.get("response_text"),
                 response_type=response.get("response_type"),
                 priority=response.get("priority"),
-                created_by=loginer_name,
+                created_by=user_id,
             )
             db.add(resp)
             db.flush()
@@ -137,7 +140,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
                         button_text=reply.get("button_text"),
                         action_type=reply.get("action_type"),
                         message_value=reply.get("message_value"),
-                        created_by=loginer_name,
+                        created_by=user_id,
                     )
                     db.add(quick_reply)
                     db.refresh(quick_reply)
@@ -166,7 +169,7 @@ def update_intent(
     db: Session = Depends(get_db),
 ):
     try:
-        loginer_name, _, _ = verify_authentication(request)
+        user_id, _, _ = verify_authentication(request)
 
         intent = (
             db.query(Intent)
@@ -252,7 +255,7 @@ def update_intent(
                     intent_id=intent.id,
                     phrase=phrase["phrase"],
                     language=phrase.get("language", "en"),
-                    created_by=loginer_name,
+                    created_by=user_id,
                 )
             )
 
@@ -266,7 +269,7 @@ def update_intent(
                 response_text=response.get("response_text"),
                 response_type=response.get("response_type"),
                 priority=response.get("priority", 1),
-                created_by=loginer_name,
+                created_by=user_id,
             )
 
             db.add(resp)
@@ -279,7 +282,7 @@ def update_intent(
                         button_text=reply.get("button_text"),
                         action_type=reply.get("action_type"),
                         message_value=reply.get("message_value"),
-                        created_by=loginer_name,
+                        created_by=user_id,
                     )
                 )
 
@@ -296,7 +299,7 @@ def update_intent(
 def delete_intent(request: Request, intent_id: int, db: Session = Depends(get_db)):
 
     try:
-        loginer_name, _, _ = verify_authentication(request)
+        user_id, _, _ = verify_authentication(request)
         intent = (
             db.query(Intent)
             .filter(Intent.id == intent_id, Intent.status != "DELETED")
@@ -305,8 +308,29 @@ def delete_intent(request: Request, intent_id: int, db: Session = Depends(get_db
         if not intent:
             raise HTTPException(404, "Intent not found")
 
-        intent.status = "INACTIVE"
-        intent.updated_by = loginer_name
+        intent.status = "DELETED"
+        intent.updated_by = user_id
+
+        phrases = (
+            db.query(TrainingPhrase).filter(TrainingPhrase.intent_id == intent.id).all()
+        )
+
+        for phrase in phrases:
+            phrase.status = "DELETED"
+
+        responses = db.query(Response).filter(Response.intent_id == intent.id).all()
+
+        for response in responses:
+
+            response.status = "DELETED"
+
+            replies = (
+                db.query(QuickReply).filter(QuickReply.response_id == response.id).all()
+            )
+
+            for reply in replies:
+                reply.status = "DELETED"
+
         db.commit()
         return {"status": "Success", "message": "Intent Deleted Successfully"}
 
