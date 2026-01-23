@@ -2,14 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from models import get_db
-from models.models import (
-    Intent,
-    IntentCategory,
-    NLPSetting,
-    QuickReply,
-    Response,
-    TrainingPhrase,
-)
+from models.models import Intent, IntentCategory, QuickReply, Response, TrainingPhrase
 from resources.utils import verify_authentication
 from sqlalchemy.orm import Session
 
@@ -572,54 +565,3 @@ def delete_intent_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from e
-
-
-# -------------------------------------------------
-# NLP SETTINGS
-# -------------------------------------------------
-
-
-@router.post("/nlp/settings")
-def set_nlp_setting(payload: dict, db: Session = Depends(get_db)):
-    setting = db.query(NLPSetting).filter(NLPSetting.key == payload["key"]).first()
-
-    if setting:
-        setting.value = payload["value"]
-    else:
-        setting = NLPSetting(
-            key=payload["key"], value=payload["value"], created_at=datetime.utcnow()
-        )
-        db.add(setting)
-
-    db.commit()
-    return setting
-
-
-@router.get("/nlp/settings")
-def list_nlp_settings(db: Session = Depends(get_db)):
-    return db.query(NLPSetting).all()
-
-
-# -------------------------------------------------
-# NLP TRAINING EXPORT (MOST IMPORTANT)
-# -------------------------------------------------
-
-
-@router.get("/nlp/export")
-def export_nlp_training_data(db: Session = Depends(get_db)):
-    intents = db.query(Intent).filter(Intent.status == "ACTIVE").all()
-
-    export_data = {"intents": []}
-
-    for intent in intents:
-        phrases = (
-            db.query(TrainingPhrase.phrase)
-            .filter(TrainingPhrase.intent_id == intent.id)
-            .all()
-        )
-
-        export_data["intents"].append(
-            {"name": intent.name, "phrases": [p.phrase for p in phrases]}
-        )
-
-    return export_data

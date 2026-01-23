@@ -14,9 +14,11 @@ router = APIRouter()
 
 
 @router.post("/login_user")
-def login(request: Request, email: str, password: str, db: Session = Depends(get_db)):
+def login(request: Request, payload: dict, db: Session = Depends(get_db)):
 
     try:
+        email = payload.get("email")
+        password = payload.get("password")
 
         user = (
             db.query(User).filter(User.email == email, User.status != "DELETED").first()
@@ -82,9 +84,9 @@ def login(request: Request, email: str, password: str, db: Session = Depends(get
                 menus[sidemenu.id] = {
                     "menu_id": sidemenu.id,
                     "order_no": sidemenu.order_no,
-                    "menu_name": sidemenu.menu_name,
-                    "menu_link": sidemenu.menu_link,
-                    "menu_icon": sidemenu.menu_icon,
+                    "name": sidemenu.menu_name,
+                    "path": sidemenu.menu_link,
+                    "icon": sidemenu.menu_icon,
                     "permissions": {
                         "add": permission.add,
                         "edit": permission.edit,
@@ -100,7 +102,7 @@ def login(request: Request, email: str, password: str, db: Session = Depends(get
 
         if sorted_menus:
             first_menu = sorted_menus[0]
-            menu_link = first_menu["menu_link"]
+            menu_link = first_menu["path"]
 
         redirect_url = menu_link
 
@@ -111,9 +113,9 @@ def login(request: Request, email: str, password: str, db: Session = Depends(get
                     "id": user.id,
                     "email": user.email,
                     "role_id": user.role,
-                    "token": access_token,
                 },
-                "rolepermission": sorted_menus,
+                "token": access_token,
+                "menus": sorted_menus,
             }
         )
 
