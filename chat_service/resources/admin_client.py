@@ -33,3 +33,22 @@ async def fetch_intent_phrases() -> dict:
         intent_phrases[intent["name"]] = intent.get("phrases", [])
 
     return intent_phrases
+
+
+async def fetch_available_agents():
+    async with httpx.AsyncClient(timeout=5) as client:
+        res = await client.get(f"{ServiceURL.ADMIN_BASE_URL}/admin/agents/available")
+        res.raise_for_status()
+        return res.json().get("agents", [])
+
+
+async def mark_agent_busy(agent_id: int):
+    async with httpx.AsyncClient(timeout=5) as client:
+        await client.post(f"{ServiceURL.ADMIN_BASE_URL}/admin/agents/{agent_id}/busy")
+
+
+async def mark_agent_available(agent_id: int):
+    async with httpx.AsyncClient(timeout=5) as client:
+        await client.post(
+            f"{ServiceURL.ADMIN_BASE_URL}/admin/agents/{agent_id}/available"
+        )

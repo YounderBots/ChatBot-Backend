@@ -38,6 +38,7 @@ def verify_authentication(request: Request):
             algorithms=[BaseConfig.ALGORITHM],
         )
     except JWTError as exc:
+        print(exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -80,7 +81,9 @@ def verify_hash(plain_text: str, hashed_text: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=BaseConfig.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode, BaseConfig.SECRET_KEY, algorithm=BaseConfig.ALGORITHM

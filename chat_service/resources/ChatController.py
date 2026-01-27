@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -6,9 +7,13 @@ from models.models import Conversation, Escalation, Sessions
 from resources import context, nlp_client
 from resources.admin_client import (
     fetch_ai_settings,
+    fetch_available_agents,
     fetch_escalation_keywords,
     fetch_intent_phrases,
+    mark_agent_available,
+    mark_agent_busy,
 )
+from resources.cache import get_cache, set_cache
 from resources.utils import (
     allow_request,
     build_response,
@@ -49,6 +54,8 @@ async def chat(payload: dict):
 # ------------------------------------------------------------------
 # Process Message Helper Function
 # ------------------------------------------------------------------
+
+
 async def process_message(db: Session, session_id: str, text: str, platform="web"):
     """
     Core chat processing pipeline.
@@ -72,23 +79,38 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
         db.refresh(session)
 
     session_id = session.id
+    user_id = session.user_id  # may be None
 
-    user_id = session.user_id  # may be None for anonymous
+    # ------------------------------------------------------------------
+    # ADMIN CONFIG (WITH REDIS CACHE)
+    # ------------------------------------------------------------------
+    cache_key_ai = f"ai_settings:{user_id}"
+    cache_key_keywords = f"escalation_keywords:{user_id}"
+    cache_key_phrases = "intent_phrases"
 
-    try:
-        ai_settings = await fetch_ai_settings(user_id)
-    except Exception:
-        ai_settings = {"confidence_threshold": 60}
+    ai_settings = get_cache(cache_key_ai)
+    if not ai_settings:
+        try:
+            ai_settings = await fetch_ai_settings(user_id)
+            set_cache(cache_key_ai, ai_settings, ttl=600)
+        except Exception:
+            ai_settings = {"confidence_threshold": 60}
 
-    try:
-        escalation_keywords = await fetch_escalation_keywords(user_id)
-    except Exception:
-        escalation_keywords = []
+    escalation_keywords = get_cache(cache_key_keywords)
+    if not escalation_keywords:
+        try:
+            escalation_keywords = await fetch_escalation_keywords(user_id)
+            set_cache(cache_key_keywords, escalation_keywords, ttl=600)
+        except Exception:
+            escalation_keywords = []
 
-    try:
-        intent_phrases = await fetch_intent_phrases()
-    except Exception:
-        intent_phrases = {}
+    intent_phrases = get_cache(cache_key_phrases)
+    if not intent_phrases:
+        try:
+            intent_phrases = await fetch_intent_phrases()
+            set_cache(cache_key_phrases, intent_phrases, ttl=3600)
+        except Exception:
+            intent_phrases = {}
 
     # ------------------------------------------------------------------
     # Save USER message
@@ -103,8 +125,25 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
     db.commit()
     db.refresh(user_message)
 
+    active_escalation = (
+        db.query(Escalation)
+        .filter(Escalation.session_id == session_id, Escalation.status == "ASSIGNED")
+        .first()
+    )
+
+    if active_escalation:
+        return {
+            "session_id": session_id,
+            "user_message_id": user_message.id,
+            "response": {
+                "type": "AGENT",
+                "message": "You are now connected to a human agent.",
+            },
+            "nlp": None,
+        }
+
     # ------------------------------------------------------------------
-    # NLP SERVICE CALL WITH CIRCUIT BREAKER
+    # NLP SERVICE CALL
     # ------------------------------------------------------------------
     service_name = "nlp_service"
 
@@ -136,19 +175,22 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
     intent = nlp_result.get("intent")
     confidence = nlp_result.get("confidence")
     route = nlp_result.get("route")
-    entities = nlp_result.get("entities", {})
+    entities = json.dumps(nlp_result.get("entities", {}))
     handoff = nlp_result.get("handoff_detected", False)
 
     # ------------------------------------------------------------------
-    # Update Redis Context
+    # OVERRIDE ROUTE ON HANDOFF
+    # ------------------------------------------------------------------
+    if handoff:
+        route = "ESCALATE"
+
+    # ------------------------------------------------------------------
+    # Context + Analytics
     # ------------------------------------------------------------------
     context.update_context(
         session_id, {"last_intent": intent, "confidence": confidence, "route": route}
     )
 
-    # ------------------------------------------------------------------
-    # Analytics Hook (NON-BLOCKING)
-    # ------------------------------------------------------------------
     log_event(
         "nlp_processed",
         {
@@ -160,24 +202,52 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
     )
 
     # ------------------------------------------------------------------
-    # Escalation Logic (INLINE DB WRITE)
+    # Escalation + Agent Assignment
     # ------------------------------------------------------------------
-    if handoff or route == "FALLBACK":
+    if route in ["FALLBACK", "ESCALATE"]:
         escalation = Escalation(
             session_id=session_id,
             conversation_id=user_message.id,
             reason="Low confidence or user requested human",
             priority="medium",
-            status="pending",
+            status="PENDING",
             created_at=datetime.utcnow(),
         )
+
+        try:
+            agents = await fetch_available_agents()
+        except Exception:
+            agents = []
+
+        if agents:
+            assigned_agent_id = None
+            min_load = float("inf")
+
+            for agent in agents:
+                load = (
+                    db.query(Escalation)
+                    .filter(
+                        Escalation.assigned_to == agent["id"],
+                        Escalation.status == "ASSIGNED",
+                    )
+                    .count()
+                )
+
+                if load < min_load:
+                    min_load = load
+                    assigned_agent_id = agent["id"]
+
+            if assigned_agent_id:
+                escalation.assigned_to = assigned_agent_id
+                escalation.status = "ASSIGNED"
+
         db.add(escalation)
         db.commit()
 
     # ------------------------------------------------------------------
-    # Build Bot Response (Decision Engine)
+    # Build Bot Response
     # ------------------------------------------------------------------
-    bot_response = build_response(nlp_result)
+    bot_response = build_response({**nlp_result, "route": route})
 
     # ------------------------------------------------------------------
     # Save BOT message
@@ -189,7 +259,7 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
         intent_detected=intent,
         confidence_score=confidence,
         entities=entities,
-        is_fallback=(route == "FALLBACK"),
+        is_fallback="YES" if route == "FALLBACK" else "NO",
         created_at=datetime.utcnow(),
     )
     db.add(bot_message)
@@ -197,7 +267,7 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
     db.refresh(bot_message)
 
     # ------------------------------------------------------------------
-    # Final Response to Client
+    # Final Response
     # ------------------------------------------------------------------
     return {
         "session_id": session_id,
@@ -217,21 +287,116 @@ active_connections = {}
 
 
 async def chat_ws(websocket: WebSocket, session_key: str):
+    """
+    User WebSocket:
+    - Registers user connection
+    - Receives user messages
+    - Calls process_message()
+    - Sends bot responses
+    - Receives agent messages (via active_connections)
+    """
+
     await websocket.accept()
-    active_connections[session_key] = websocket
 
     db: Session = SessionLocal()
 
     try:
+        print(websocket, session_key)
+        session = db.query(Sessions).filter(Sessions.session_key == session_key).first()
+
+        if not session:
+            session = Sessions(
+                session_key=session_key,
+                platform="web",
+                started_at=datetime.utcnow(),
+                status="ACTIVE",
+            )
+            db.add(session)
+            db.commit()
+            db.refresh(session)
+
+        session_id = session.id
+
+        active_connections[f"user:{session_id}"] = websocket
+
         while True:
             data = await websocket.receive_json()
             text = data.get("text")
 
-            result = await process_message(db=db, session_id=session_key, text=text)
+            if not text:
+                await websocket.send_json({"error": "Message text is required"})
+                continue
+
+            result = await process_message(
+                db=db,
+                session_id=session_key,
+                text=text,
+            )
 
             await websocket.send_json(result)
 
     except WebSocketDisconnect:
-        active_connections.pop(session_key, None)
+        active_connections.pop(f"user:{session_id}", None)
+
+    except Exception as e:
+        print(e)
+        await websocket.send_json({"error": "Internal WebSocket error"})
+        active_connections.pop(f"user:{session_id}", None)
+
     finally:
+        db.close()
+
+
+@router.websocket("/ws/agent/{agent_id}")
+async def agent_ws(websocket: WebSocket, agent_id: int):
+    await websocket.accept()
+    await mark_agent_busy(agent_id)
+    active_connections[f"agent:{agent_id}"] = websocket
+
+    db: Session = SessionLocal()
+    active_connections[f"agent:{agent_id}"] = websocket
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+
+            session_id = data.get("session_id")
+            message = data.get("message")
+
+            if not session_id or not message:
+                continue
+
+            convo = Conversation(
+                session_id=session_id,
+                sender="agent",
+                message_text=message,
+                created_at=datetime.utcnow(),
+            )
+            db.add(convo)
+            db.commit()
+
+            user_ws = active_connections.get(f"user:{session_id}")
+            if user_ws:
+                await user_ws.send_json(
+                    {
+                        "sender": "agent",
+                        "message": message,
+                        "session_id": session_id,
+                    }
+                )
+
+    except WebSocketDisconnect:
+        active_connections.pop(f"agent:{agent_id}", None)
+
+    except Exception as e:
+        print(e)
+        active_connections.pop(f"agent:{agent_id}", None)
+
+    finally:
+        await mark_agent_available(agent_id)
+        active_connections.pop(f"agent:{agent_id}", None)
         db.close()

@@ -1,3 +1,4 @@
+import base64
 import shutil
 import uuid
 from datetime import datetime
@@ -225,16 +226,17 @@ def create_users(request: Request, payload: dict, db: Session = Depends(get_db))
         password = payload.get("password")
         hashed_password = hash_text(password)
 
-        image = payload.get("profile_image")
         file_location = None
+        image = payload.get("profile_image")
         if image:
-            upload_file = image.content_type
-            extention = upload_file.split("/")[-1]
-            token_photo = str(uuid.uuid4()) + "." + str(extention)
-            file_location = f"./templates/static/uploaded_imge/{token_photo}"
-            with open(file_location, "wb+") as file_object:
-                shutil.copyfileobj(image.file, file_object)
 
+            header, encoded = image.split(",", 1)
+            ext = header.split("/")[1].split(";")[0]
+            token = f"{uuid.uuid4()}.{ext}"
+            file_location = f"./templates/static/uploaded_imge/{token}"
+
+            with open(file_location, "wb") as f:
+                f.write(base64.b64decode(encoded))
         user = User(
             fullname=payload.get("fullname"),
             email=payload.get("email"),
@@ -256,6 +258,7 @@ def create_users(request: Request, payload: dict, db: Session = Depends(get_db))
 
     except Exception as e:
         db.rollback()
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
@@ -340,12 +343,13 @@ def update_user(
 
         image = payload.get("profile_image")
         if image:
-            upload_file = image.content_type
-            extention = upload_file.split("/")[-1]
-            token_photo = str(uuid.uuid4()) + "." + str(extention)
-            file_location = f"./templates/static/uploaded_imge/{token_photo}"
-            with open(file_location, "wb+") as file_object:
-                shutil.copyfileobj(image.file, file_object)
+            header, encoded = image.split(",", 1)
+            ext = header.split("/")[1].split(";")[0]
+            token = f"{uuid.uuid4()}.{ext}"
+            file_location = f"./templates/static/uploaded_image/{token}"
+
+            with open(file_location, "wb") as f:
+                f.write(base64.b64decode(encoded))
 
         user.fullname = payload.get("fullname", user.fullname)
         user.email = payload.get("email", user.email)
@@ -406,3 +410,24 @@ def delete_user(request: Request, user_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from e
+
+
+@router.get("/agents/available")
+def get_available_agents(db: Session = Depends(get_db)):
+    """
+    Returns available support agents
+    """
+
+    agents = (
+        db.query(User)
+        .join(Role, Role.id == User.role)
+        .filter(Role.name == "AGENT", User.status == "ACTIVE")
+        .all()
+    )
+
+    return {
+        "agents": [
+            {"id": agent.id, "name": agent.fullname, "email": agent.email}
+            for agent in agents
+        ]
+    }

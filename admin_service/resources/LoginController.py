@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from models import get_db
 from models.models import RolePermission, SideMenuCategory, User
+from regex import P
 from resources.utils import create_access_token, verify_hash
 from sqlalchemy.orm import Session
 
@@ -120,6 +121,7 @@ def login(request: Request, payload: dict, db: Session = Depends(get_db)):
         )
 
     except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
