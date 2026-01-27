@@ -12,3 +12,9 @@ class BaseConfig:
 class Base(DeclarativeBase):
 
     pass
+
+
+class ServiceURL:
+
+    NLP_URL = "http://localhost:8001/nlp/parse"
+    ADMIN_BASE_URL = "http://localhost:8002/admin"

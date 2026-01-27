@@ -66,10 +66,17 @@ def _open_until_key(service: str) -> str:
 
 
 def allow_request(service: str) -> bool:
-    open_until = redis_client.get(_open_until_key(service))
-    if not open_until:
+    try:
+        open_until = redis_client.get(_open_until_key(service))
+    except Exception as e:
+        # log warning and allow request
+        logger.warning(f"Redis unavailable, allowing request: {e}")
         return True
-    return time() > float(open_until)
+
+    if open_until and int(open_until) > time.time():
+        return False
+
+    return True
 
 
 def record_failure(service: str):

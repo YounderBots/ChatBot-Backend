@@ -1,5 +1,4 @@
-from fastapi import APIRouter, HTTPException
-
+from fastapi import APIRouter
 from resources.NLPController import router as nlprouter
 from resources.TrainController import router as trainingrouter
 

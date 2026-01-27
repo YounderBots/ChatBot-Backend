@@ -4,6 +4,11 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from models import SessionLocal
 from models.models import Conversation, Escalation, Sessions
 from resources import context, nlp_client
+from resources.admin_client import (
+    fetch_ai_settings,
+    fetch_escalation_keywords,
+    fetch_intent_phrases,
+)
 from resources.utils import (
     allow_request,
     build_response,
@@ -60,13 +65,30 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
             session_key=session_id,
             platform=platform,
             started_at=datetime.utcnow(),
-            is_active=True,
+            status="ACTIVE",
         )
         db.add(session)
         db.commit()
         db.refresh(session)
 
     session_id = session.id
+
+    user_id = session.user_id  # may be None for anonymous
+
+    try:
+        ai_settings = await fetch_ai_settings(user_id)
+    except Exception:
+        ai_settings = {"confidence_threshold": 60}
+
+    try:
+        escalation_keywords = await fetch_escalation_keywords(user_id)
+    except Exception:
+        escalation_keywords = []
+
+    try:
+        intent_phrases = await fetch_intent_phrases()
+    except Exception:
+        intent_phrases = {}
 
     # ------------------------------------------------------------------
     # Save USER message
@@ -95,7 +117,12 @@ async def process_message(db: Session, session_id: str, text: str, platform="web
         }
     else:
         try:
-            nlp_result = await nlp_client.analyze_text(text)
+            nlp_result = await nlp_client.analyze_text(
+                text=text,
+                ai_settings=ai_settings,
+                escalation_keywords=escalation_keywords,
+                intent_phrases=intent_phrases,
+            )
             record_success(service_name)
         except Exception:
             record_failure(service_name)

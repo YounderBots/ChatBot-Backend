@@ -3,13 +3,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
-from fastapi.staticfiles import StaticFiles
 from routes import router
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.sessions import SessionMiddleware
 
-app = FastAPI(title="Chat Service", version="00.1", root_path="/chat")
+app = FastAPI(title="Chat Service", version="00.1", root_path="")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,8 +19,6 @@ app.add_middleware(
 )
 
 app.add_middleware(SessionMiddleware, secret_key="some-random-string")
-
-app.mount("/templates/static", StaticFiles(directory="templates/static"), name="static")
 
 
 @app.on_event("startup")

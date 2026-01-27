@@ -1,8 +1,7 @@
 import httpx
-from fastapi import APIRouter, HTTPException
-
 from configs.base_config import BaseConfig
-from resources import fallback
+from fastapi import APIRouter, HTTPException
+from resources.utils import extract_entities, similarity_fallback
 
 router = APIRouter()
 
@@ -10,30 +9,74 @@ router = APIRouter()
 @router.post("/parse")
 async def parse(payload: dict):
     text = payload.get("text")
+    ai_settings = payload.get("ai_settings", {})
+    escalation_keywords = payload.get("escalation_keywords", [])
+    intent_phrases = payload.get("intent_phrases", {})
 
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
 
-    rasa_result = await parse_text(text)
+    # -------------------------------
+    # Call Rasa
+    # -------------------------------
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.post(
+                BaseConfig.RASA_URL,
+                json={"text": text},
+            )
+            response.raise_for_status()
+            rasa_result = response.json()
+    except Exception as e:
+        return {
+            "error": e,
+            "intent": "system_error",
+            "confidence": 0.0,
+            "entities": {},
+            "route": "FALLBACK",
+            "handoff_detected": True,
+            "fallback_suggestions": [],
+        }
 
     intent = rasa_result["intent"]["name"]
-    conf = rasa_result["intent"]["confidence"]
-
+    confidence = rasa_result["intent"]["confidence"]
     entities = extract_entities(rasa_result.get("entities", []))
 
-    route = classify_route(conf)
-    handoff = detect_handoff(text)
+    # -------------------------------
+    # Confidence routing
+    # -------------------------------
+    high = ai_settings.get("confidence_high", 0.6)
+    medium = ai_settings.get("confidence_medium", 0.4)
 
+    if confidence >= high:
+        route = "NORMAL"
+    elif confidence >= medium:
+        route = "CLARIFY"
+    else:
+        route = "FALLBACK"
+
+    # -------------------------------
+    # Handoff keyword detection
+    # -------------------------------
+    text_lower = text.lower()
+    handoff_detected = any(k.lower() in text_lower for k in escalation_keywords)
+
+    # -------------------------------
+    # Similarity fallback
+    # -------------------------------
     suggestions = []
-    if route == "FALLBACK":
-        suggestions = fallback.suggest_similar_intents(text)
+    if route == "FALLBACK" and intent_phrases:
+        suggestions = similarity_fallback(text, intent_phrases)
 
+    # -------------------------------
+    # Final NLP response
+    # -------------------------------
     return {
         "intent": intent,
-        "confidence": round(conf, 3),
+        "confidence": round(confidence, 3),
         "entities": entities,
         "route": route,
-        "handoff_detected": handoff,
+        "handoff_detected": handoff_detected,
         "fallback_suggestions": suggestions,
     }
 
@@ -43,34 +86,3 @@ async def parse_text(text: str) -> dict:
         response = await client.post(BaseConfig.RASA_URL, json={"text": text})
         response.raise_for_status()
         return response.json()
-
-
-def classify_route(confidence: float) -> str:
-    if confidence >= BaseConfig.CONFIDENCE_HIGH:
-        return "NORMAL"
-    elif confidence >= BaseConfig.CONFIDENCE_MEDIUM:
-        return "CLARIFY"
-    return "FALLBACK"
-
-
-def detect_handoff(text: str) -> bool:
-    text = text.lower()
-    return any(keyword in text for keyword in BaseConfig.HANDOFF_KEYWORDS)
-
-
-def trigger_training():
-    """
-    Stub for training trigger.
-    In real use:
-    - Export data from Admin Service
-    - Run `rasa train`
-    - Update training history
-    """
-    return {"status": "started", "message": "Training triggered successfully"}
-
-
-def extract_entities(rasa_entities: list) -> dict:
-    entities = {}
-    for entity in rasa_entities:
-        entities[entity["entity"]] = entity["value"]
-    return entities

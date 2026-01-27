@@ -2,7 +2,7 @@ from datetime import datetime
 
 from configs.base_config import Base
 from models import engine
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text
 
 
 class Sessions(Base):
@@ -19,7 +19,7 @@ class Sessions(Base):
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
     status = Column(String(50), default=True)
-    metadata = Column(Text)
+    session_metadata = Column(JSON)
 
 
 class Conversation(Base):
@@ -35,12 +35,12 @@ class Conversation(Base):
     message_type = Column(String(100))
     intent_detected = Column(String(100))
     confidence_score = Column(Float)
-    entities = Column(Text)
+    entities = Column(JSON)
     sentiment = Column(String(100), nullable=True)
     language = Column(String(10), default="en")
     response_time_ms = Column(Integer)
     is_fallback = Column(String(100), default=False)
-    metadata = Column(Text)
+    session_metadata = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

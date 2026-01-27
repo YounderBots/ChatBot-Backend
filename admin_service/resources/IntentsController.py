@@ -146,6 +146,7 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
         }
 
     except Exception as e:
+        print(e)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

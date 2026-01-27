@@ -1,19 +1,23 @@
-import time
-
 import httpx
-
-NLP_URL = "http://localhost:8001/nlp/parse"
-MAX_RETRIES = 3
+from configs.base_config import ServiceURL
 
 
-async def analyze_text(text: str) -> dict:
-    for attempt in range(MAX_RETRIES):
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                res = await client.post(NLP_URL, json={"text": text})
-                res.raise_for_status()
-                return res.json()
-        except Exception:
-            if attempt == MAX_RETRIES - 1:
-                raise
-            time.sleep(0.5)
+async def analyze_text(
+    text: str, ai_settings: dict, escalation_keywords: list, intent_phrases: dict
+) -> dict:
+
+    payload = {
+        "text": text,
+        "ai_settings": {
+            "confidence_high": ai_settings.get("confidence_threshold", 60) / 100,
+            "confidence_medium": (ai_settings.get("confidence_threshold", 60) - 20)
+            / 100,
+        },
+        "escalation_keywords": escalation_keywords,
+        "intent_phrases": intent_phrases,
+    }
+
+    async with httpx.AsyncClient(timeout=5) as client:
+        response = await client.post(ServiceURL.NLP_URL, json=payload)
+        response.raise_for_status()
+        return response.json()

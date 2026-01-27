@@ -2,11 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from routes import router
 from starlette.middleware.sessions import SessionMiddleware
 
-from routes import router
-
-app = FastAPI(title="NLP Service", version="00.1", root_path="/nlp")
+app = FastAPI(title="NLP Service", version="00.1", root_path="")
 
 app.add_middleware(
     CORSMiddleware,
