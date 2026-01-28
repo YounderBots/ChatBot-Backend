@@ -59,10 +59,10 @@ def login(request: Request, payload: dict, db: Session = Depends(get_db)):
             # SKIP IF ALL PERMISSIONS ARE "no"
             if not any(
                 [
-                    permission.add == "yes",
-                    permission.edit == "yes",
-                    permission.delete == "yes",
-                    permission.view == "yes",
+                    permission.add,
+                    permission.edit,
+                    permission.delete,
+                    permission.view,
                 ]
             ):
                 continue

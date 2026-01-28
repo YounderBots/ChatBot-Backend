@@ -1,7 +1,10 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import time
+from typing import Optional
 
+import jwt
+from configs.base_config import BaseConfig
 from configs.redis import redis_client
 
 logger = logging.getLogger("chat_analytics")
@@ -91,3 +94,15 @@ def record_failure(service: str):
 def record_success(service: str):
     redis_client.delete(_failures_key(service))
     redis_client.delete(_open_until_key(service))
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=BaseConfig.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(
+        to_encode, BaseConfig.SECRET_KEY, algorithm=BaseConfig.ALGORITHM
+    )
+    return encoded_jwt

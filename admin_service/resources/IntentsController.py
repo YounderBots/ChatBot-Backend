@@ -22,9 +22,58 @@ def list_intents(request: Request, db: Session = Depends(get_db)):
 
         intents = db.query(Intent).filter(Intent.status != "DELETED").all()
 
-        return intents
+        result = []
+
+        for intent in intents:
+            phrases = (
+                db.query(TrainingPhrase)
+                .filter(
+                    TrainingPhrase.intent_id == intent.id,
+                    TrainingPhrase.status != "DELETED",
+                )
+                .count()
+            )
+            responses = (
+                db.query(Response)
+                .filter(Response.intent_id == intent.id, Response.status != "DELETED")
+                .count()
+            )
+
+            category = (
+                db.query(IntentCategory)
+                .filter(
+                    IntentCategory.id == intent.category,
+                    IntentCategory.status != "DELETED",
+                )
+                .first()
+            )
+            result.append(
+                {
+                    "id": intent.id,
+                    "intent_name": intent.intent_name,
+                    "name": intent.name,
+                    "description": intent.description,
+                    "category": intent.category,
+                    "category_name": category.name if category else intent.category,
+                    "priority": intent.priority,
+                    "fallback": intent.fallback,
+                    "confidence": intent.confidence,
+                    "response_status": intent.response_status,
+                    "approval_status": intent.approval_status,
+                    "status": intent.status,
+                    "phrases": phrases,
+                    "responses": responses,
+                    "usage": 0,
+                    "last_modified": (
+                        intent.updated_at if intent.updated_at else intent.created_at
+                    ),
+                }
+            )
+
+        return result
 
     except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
@@ -36,6 +85,8 @@ def create_intent(request: Request, payload: dict, db: Session = Depends(get_db)
 
     try:
         user_id, _, _ = verify_authentication(request)
+
+        print(payload)
 
         existing_intent = (
             db.query(Intent)
@@ -427,11 +478,27 @@ def list_intent_category(request: Request, db: Session = Depends(get_db)):
     try:
         verify_authentication(request)
 
-        category = (
+        categories = (
             db.query(IntentCategory).filter(IntentCategory.status != "DELETED").all()
         )
 
-        return category
+        result = []
+
+        for category in categories:
+            result.append(
+                {
+                    "id": category.id,
+                    "name": category.name,
+                    "description": category.description,
+                    "last_modified": (
+                        category.updated_at
+                        if category.updated_at
+                        else category.created_at
+                    ),
+                }
+            )
+
+        return result
 
     except Exception as e:
         raise HTTPException(
@@ -465,7 +532,7 @@ def create_intent_category(
 
         category = IntentCategory(
             name=payload["name"],
-            status=payload.get("status"),
+            description=payload["description"],
             created_by=user_id,
         )
 
@@ -525,7 +592,7 @@ def update_intent_category(
         # UPDATE INTENT
         # -----------------------------
         category.name = payload.get("name", category.name)
-        category.status = payload.get("status", category.status)
+        category.description = payload.get("description", category.description)
         category.updated_by = user_id
 
         db.commit()

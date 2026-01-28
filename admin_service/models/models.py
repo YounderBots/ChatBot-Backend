@@ -1,6 +1,16 @@
 from configs.base_config import Base
 from models import engine
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, Time, func
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    Time,
+    func,
+)
 
 
 class Role(Base):
@@ -23,10 +33,10 @@ class RolePermission(Base):
     id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     role_id = Column(Integer, nullable=False, index=True)
     menu_id = Column(String(50), nullable=True, index=True)
-    add = Column(String(50), nullable=True)
-    edit = Column(String(50), nullable=True)
-    delete = Column(String(50), nullable=True)
-    view = Column(String(50), nullable=True)
+    add = Column(Boolean, nullable=True)
+    edit = Column(Boolean, nullable=True)
+    delete = Column(Boolean, nullable=True)
+    view = Column(Boolean, nullable=True)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
     created_by = Column(String(50), nullable=False)
@@ -68,6 +78,17 @@ class User(Base):
     updated_by = Column(String(50), nullable=True)
 
 
+class Customer(Base):
+
+    __tablename__ = "customer"
+
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    email = Column(String(100), nullable=False, unique=True, index=True)
+    status = Column(String(50), default="ACTIVE")
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class Intent(Base):
 
     __tablename__ = "intents"
@@ -97,6 +118,7 @@ class IntentCategory(Base):
 
     id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
     created_by = Column(String(50), nullable=False)
@@ -159,6 +181,42 @@ class ArticleCategory(Base):
     id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
     name = Column(String(50), nullable=False, index=True)
     order = Column(Integer, unique=True, nullable=False)
+    status = Column(String(50), default="ACTIVE")
+    created_at = Column(DateTime, server_default=func.now())
+    created_by = Column(String(50), nullable=False)
+    updated_at = Column(DateTime, onupdate=func.now())
+    updated_by = Column(String(50), nullable=True)
+
+
+class Article(Base):
+
+    __tablename__ = "article"
+
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    title = Column(String(50), nullable=False, index=True)
+    category = Column(Integer, nullable=False)
+    url = Column(Text, nullable=True)
+    tags = Column(Text, nullable=True)
+    contents = Column(Text, nullable=True)
+    meta_description = Column(Text, nullable=True)
+    featured_image = Column(Text, nullable=True)
+    article_status = Column(String(50), default="DRAFT")
+    featured_article = Column(String(50), default=False)
+    publish_date = Column(Date, nullable=False)
+    status = Column(String(50), default="ACTIVE")
+    created_at = Column(DateTime, server_default=func.now())
+    created_by = Column(String(50), nullable=False)
+    updated_at = Column(DateTime, onupdate=func.now())
+    updated_by = Column(String(50), nullable=True)
+
+
+class RelatedQuestion(Base):
+
+    __tablename__ = "related_questions"
+
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, index=True)
+    article_id = Column(Integer, nullable=False)
+    question = Column(String(50), nullable=False, index=True)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, server_default=func.now())
     created_by = Column(String(50), nullable=False)

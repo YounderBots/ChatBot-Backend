@@ -1,8 +1,20 @@
 import json
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from models import SessionLocal
+import jwt
+from configs.base_config import BaseConfig
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
+from jose import JWTError
+from models import SessionLocal, get_db
 from models.models import Conversation, Escalation, Sessions
 from resources import context, nlp_client
 from resources.admin_client import (
@@ -17,6 +29,7 @@ from resources.cache import get_cache, set_cache
 from resources.utils import (
     allow_request,
     build_response,
+    create_access_token,
     log_event,
     record_failure,
     record_success,
@@ -372,6 +385,7 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
 
             convo = Conversation(
                 session_id=session_id,
+                user_id=agent_id,
                 sender="agent",
                 message_text=message,
                 created_at=datetime.utcnow(),
@@ -400,3 +414,71 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
         await mark_agent_available(agent_id)
         active_connections.pop(f"agent:{agent_id}", None)
         db.close()
+
+
+@router.post("/session")
+def create_chat_session(payload: dict, db: Session = Depends(get_db)):
+    """
+    Create chat session BEFORE conversation starts
+    """
+
+    name = payload.get("name")
+    email = payload.get("email", "")
+    platform = payload.get("platform", "web")
+
+    if not name or not email:
+        raise HTTPException(400, "name and email are required")
+
+    session_key = f"chat-{uuid.uuid4().hex}"
+
+    session = Sessions(
+        session_key=session_key,
+        platform=platform,
+        status="ACTIVE",
+        started_at=datetime.utcnow(),
+        session_metadata=json.dumps({"name": name, "email": email}),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    payload = {"session_key": session.session_key, "session_id": session.id}
+    token = create_access_token(payload)
+
+    return {"session_key": token, "session_id": session.id}
+
+
+@router.get("/user_information")
+def get_user_information(request: Request, db: Session = Depends(get_db)):
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        session_key = auth_header.split(" ", 1)[1]
+
+    if not session_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    try:
+        payload = jwt.decode(
+            session_key,
+            BaseConfig.SECRET_KEY,
+            algorithms=[BaseConfig.ALGORITHM],
+        )
+        if payload:
+            user_data = (
+                db.query(Sessions)
+                .filter(Sessions.id == payload.get("session_id"))
+                .first()
+            )
+            user_details = user_data.session_metadata
+
+            return user_details
+    except JWTError as exc:
+        print(exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        ) from exc
